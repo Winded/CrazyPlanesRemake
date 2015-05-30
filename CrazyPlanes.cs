@@ -1,0 +1,155 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using GTA;
+using GTA.Native;
+using GTA.Math;
+
+namespace HelixMod
+{
+    public class CrazyPlanes : Script
+    {
+        public class CrazyPlane
+        {
+            public Vehicle Vehicle;
+            public int SpawnTime;
+            public int LastRocketFire;
+        }
+
+        public CrazyPlanes()
+        {
+            mHashes = new VehicleHash[]
+            {
+                VehicleHash.CargoPlane,
+                VehicleHash.Cuban800,
+                VehicleHash.Dodo,
+                VehicleHash.Duster,
+                VehicleHash.Jet,
+                VehicleHash.Luxor,
+                VehicleHash.Shamal,
+                VehicleHash.Vestra,
+            };
+            mPlanes = new List<CrazyPlane>();
+            Tick += OnTick;
+            KeyDown += OnKeyDown;
+            Interval = 100;
+        }
+
+        ~CrazyPlanes()
+        {
+            foreach (var cp in mPlanes)
+            {
+                var ped = cp.Vehicle.GetPedOnSeat(VehicleSeat.Driver);
+                if (ped != null)
+                    ped.Delete();
+                cp.Vehicle.Delete();
+            }
+            mPlanes.Clear();
+        }
+
+        private void OnKeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+        {
+            if (e.KeyCode == System.Windows.Forms.Keys.B)
+            {
+                mEnabled = !mEnabled;
+                UI.ShowSubtitle(mEnabled ? "Angry Planes ON" : "Angry Planes OFF");
+                if (!mEnabled)
+                {
+                    foreach(var cp in mPlanes)
+                    {
+                        var ped = cp.Vehicle.GetPedOnSeat(VehicleSeat.Driver);
+                        if (ped != null)
+                            ped.Delete();
+                        cp.Vehicle.Delete();
+                    }
+                    mPlanes.Clear();
+                }
+            }
+        }
+
+        private bool mEnabled = false;
+        private List<CrazyPlane> mPlanes;
+        private VehicleHash[] mHashes;
+
+        private void OnTick(object sender, EventArgs e)
+        {
+            var player = Game.Player.Character;
+
+            if (!mEnabled)
+                return;
+
+            int i = 0;
+            while(i < mPlanes.Count)
+            {
+                var pl = mPlanes[i];
+                if(pl.Vehicle == null || pl.Vehicle.IsDead)
+                {
+                    mPlanes.Remove(pl);
+                    if (pl.Vehicle != null)
+                        pl.Vehicle.MarkAsNoLongerNeeded();
+                    continue;
+                }
+                if(pl.Vehicle.GetPedOnSeat(VehicleSeat.Driver) == null)
+                {
+                    var ped = pl.Vehicle.CreatePedOnSeat(VehicleSeat.Driver, new Model(PedHash.Jesus01));
+                    ped.Task.FightAgainst(player);
+                    ped.AddBlip().SetAsHostile();
+                }
+                i++;
+            }
+
+            FireRockets();
+
+            if(mPlanes.Count < 40)
+            {
+                var spawnPos = player.Position + Vector3.RandomXYZ() * 500f;
+                spawnPos.Z = player.Position.Z + 300f;
+
+                var plane = World.CreateVehicle(new Model(RandomPlane()), spawnPos);
+                if (plane == null)
+                    return;
+
+                var cp = new CrazyPlane()
+                {
+                    Vehicle = plane,
+                    SpawnTime = Game.GameTime
+                };
+                mPlanes.Add(cp);
+            }
+        }
+
+        private void FireRockets()
+        {
+            var rocketHash = Function.Call<int>(Hash.GET_HASH_KEY, "WEAPON_VEHICLE_ROCKET");
+            if (Function.Call<bool>(Hash.HAS_WEAPON_ASSET_LOADED, rocketHash))
+            {
+                Function.Call(Hash.REQUEST_WEAPON_ASSET, rocketHash, 31, 0);
+                return;
+            }
+
+            var player = Game.Player.Character;
+            foreach(var cp in mPlanes)
+            {
+                if(Game.GameTime - cp.LastRocketFire >= 15000 && cp.Vehicle.Position.DistanceTo(player.Position) <= 250f)
+                {
+                    var dir = player.Position - cp.Vehicle.Position;
+                    dir.Normalize();
+                    var start = cp.Vehicle.Position + dir * 10f;
+                    var end = player.Position;
+                    Function.Call(Hash.SHOOT_SINGLE_BULLET_BETWEEN_COORDS, start.X, start.Y, start.Z,
+                        end.X, end.Y, end.Z, 250, 1, rocketHash, player, 1, 0, -1.0f);
+                    cp.LastRocketFire = Game.GameTime;
+                }
+            }
+        }
+
+        private VehicleHash RandomPlane()
+        {
+            var rnd = new Random(Game.GameTime);
+            var idx = rnd.Next(mHashes.Length);
+            return mHashes[idx];
+        }
+    }
+}
