@@ -14,6 +14,8 @@ namespace HelixMod
         public class CrazyPlane
         {
             public Vehicle Vehicle;
+            public Ped Pilot;
+            public Blip Blip;
             public int SpawnTime;
             public int LastRocketFire;
         }
@@ -41,10 +43,7 @@ namespace HelixMod
         {
             foreach (var cp in mPlanes)
             {
-                var ped = cp.Vehicle.GetPedOnSeat(VehicleSeat.Driver);
-                if (ped != null)
-                    ped.Delete();
-                cp.Vehicle.Delete();
+                RemovePlane(cp);
             }
             mPlanes.Clear();
         }
@@ -59,10 +58,7 @@ namespace HelixMod
                 {
                     foreach(var cp in mPlanes)
                     {
-                        var ped = cp.Vehicle.GetPedOnSeat(VehicleSeat.Driver);
-                        if (ped != null)
-                            ped.Delete();
-                        cp.Vehicle.Delete();
+                        RemovePlane(cp);
                     }
                     mPlanes.Clear();
                 }
@@ -86,16 +82,26 @@ namespace HelixMod
                 var pl = mPlanes[i];
                 if(pl.Vehicle == null || pl.Vehicle.IsDead)
                 {
-                    mPlanes.Remove(pl);
-                    if (pl.Vehicle != null)
-                        pl.Vehicle.MarkAsNoLongerNeeded();
+                    pl.Vehicle.MarkAsNoLongerNeeded();
+                    if(pl.Pilot != null)
+                    {
+                        pl.Pilot.MarkAsNoLongerNeeded();
+                    }
+                    if(pl.Blip != null)
+                    {
+                        pl.Blip.Remove();
+                        pl.Blip = null;
+                    }
                     continue;
                 }
-                if(pl.Vehicle.GetPedOnSeat(VehicleSeat.Driver) == null)
+                if(pl.Pilot == null)
                 {
                     var ped = pl.Vehicle.CreatePedOnSeat(VehicleSeat.Driver, new Model(PedHash.Jesus01));
                     ped.Task.FightAgainst(player);
-                    ped.AddBlip().SetAsHostile();
+                    //var blip = ped.AddBlip();
+                    //blip.SetAsHostile();
+                    pl.Pilot = ped;
+                    //pl.Blip = blip;
                 }
                 i++;
             }
@@ -110,6 +116,8 @@ namespace HelixMod
                 var plane = World.CreateVehicle(new Model(RandomPlane()), spawnPos);
                 if (plane == null)
                     return;
+                plane.EngineRunning = true;
+                plane.ApplyForceRelative(Vector3.RelativeFront * 10f);
 
                 var cp = new CrazyPlane()
                 {
@@ -132,14 +140,14 @@ namespace HelixMod
             var player = Game.Player.Character;
             foreach(var cp in mPlanes)
             {
-                if(Game.GameTime - cp.LastRocketFire >= 15000 && cp.Vehicle.Position.DistanceTo(player.Position) <= 250f)
+                if(Game.GameTime - cp.LastRocketFire >= 5000 && cp.Vehicle.Position.DistanceTo(player.Position) <= 250f)
                 {
                     var dir = player.Position - cp.Vehicle.Position;
                     dir.Normalize();
                     var start = cp.Vehicle.Position + dir * 10f;
                     var end = player.Position;
                     Function.Call(Hash.SHOOT_SINGLE_BULLET_BETWEEN_COORDS, start.X, start.Y, start.Z,
-                        end.X, end.Y, end.Z, 250, 1, rocketHash, player, 1, 0, -1.0f);
+                        end.X, end.Y, end.Z, 250, 1, rocketHash, cp.Pilot, 1, 0, -1.0f);
                     cp.LastRocketFire = Game.GameTime;
                 }
             }
@@ -150,6 +158,23 @@ namespace HelixMod
             var rnd = new Random(Game.GameTime);
             var idx = rnd.Next(mHashes.Length);
             return mHashes[idx];
+        }
+
+        private void RemovePlane(CrazyPlane cp)
+        {
+            mPlanes.Remove(cp);
+            if (cp.Pilot != null)
+            {
+                cp.Pilot.Delete();
+            }
+            if (cp.Blip != null)
+            {
+                cp.Blip.Remove();
+            }
+            if (cp.Vehicle != null)
+            {
+                cp.Vehicle.Delete();
+            }
         }
     }
 }
