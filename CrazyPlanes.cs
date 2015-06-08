@@ -82,16 +82,20 @@ namespace CrazyPlanes
                 var pl = mPlanes[i];
                 if(pl.Vehicle == null || pl.Vehicle.IsDead)
                 {
-                    pl.Vehicle.MarkAsNoLongerNeeded();
                     if(pl.Pilot != null)
                     {
-                        pl.Pilot.MarkAsNoLongerNeeded();
+                        pl.Pilot.Delete();
                     }
                     if(pl.Blip != null)
                     {
                         pl.Blip.Remove();
-                        pl.Blip = null;
                     }
+                    if (pl.Vehicle != null)
+                    {
+                        pl.Vehicle.MarkAsNoLongerNeeded();
+                        //pl.Vehicle.Delete();
+                    }
+                    mPlanes.Remove(pl);
                     continue;
                 }
                 if(pl.Pilot == null)
@@ -162,7 +166,6 @@ namespace CrazyPlanes
 
         private void RemovePlane(CrazyPlane cp)
         {
-            mPlanes.Remove(cp);
             if (cp.Pilot != null)
             {
                 cp.Pilot.Delete();
