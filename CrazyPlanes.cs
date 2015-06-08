@@ -7,7 +7,7 @@ using GTA;
 using GTA.Native;
 using GTA.Math;
 
-namespace HelixMod
+namespace CrazyPlanes
 {
     public class CrazyPlanes : Script
     {
@@ -108,7 +108,7 @@ namespace HelixMod
 
             FireRockets();
 
-            if(mPlanes.Count < 40)
+            if(mPlanes.Count < 30)
             {
                 var spawnPos = player.Position + Vector3.RandomXYZ() * 500f;
                 spawnPos.Z = player.Position.Z + 300f;
